@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PULSE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --black:#080808;--white:#f2f2f2;--red:#e8002d;--grey:#1c1c1c;
+  --mid:#555;--light:#aaa;
+}
+html,body{
+  width:100%;height:100%;overflow:hidden;
+  background:var(--black);
+  font-family:'Impact','Arial Narrow',sans-serif;
+  touch-action:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#wrap{
+  position:relative;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+}
+canvas{display:block;cursor:pointer;}
+
+/* HUD */
+#hud{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:min(400px,100vw);
+  padding:0;display:none;
+  z-index:10;pointer-events:none;
+}
+#hud-inner{
+  display:flex;justify-content:space-between;align-items:stretch;
+  border-bottom:3px solid var(--white);
+}
+.hud-box{
+  padding:8px 14px;
+  border-right:2px solid var(--white);
+  flex:1;
+}
+.hud-box:last-child{border-right:none;}
+.hud-label{
+  font-size:9px;letter-spacing:3px;color:var(--mid);
+  text-transform:uppercase;font-family:'Courier New',monospace;
+  line-height:1;
+}
+.hud-val{
+  font-size:clamp(18px,5vw,26px);letter-spacing:1px;
+  color:var(--white);line-height:1.1;margin-top:2px;
+}
+#hud-combo .hud-val{color:var(--red);}
+#miss-flash{
+  position:absolute;inset:0;background:var(--red);
+  opacity:0;pointer-events:none;z-index:50;
+  transition:opacity 0.05s;
+}
+
+/* Screens */
+.screen{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:0;z-index:20;
+  background:var(--black);
+}
+.s-title{
+  font-size:clamp(72px,22vw,140px);
+  letter-spacing:-2px;line-height:0.85;
+  color:var(--white);
+  font-family:'Impact','Arial Narrow',sans-serif;
+  text-align:center;
+}
+.s-rule{width:min(380px,90vw);height:4px;background:var(--white);margin:18px 0;}
+.s-sub{
+  font-size:clamp(10px,3vw,14px);
+  letter-spacing:6px;color:var(--mid);
+  font-family:'Courier New',monospace;
+  text-transform:uppercase;text-align:center;
+  line-height:2;
+}
+.s-score-label{
+  font-size:clamp(10px,2.5vw,12px);
+  letter-spacing:5px;color:var(--mid);
+  font-family:'Courier New',monospace;
+  text-transform:uppercase;margin-top:24px;
+}
+.s-score{
+  font-size:clamp(48px,14vw,88px);
+  letter-spacing:-1px;color:var(--white);line-height:1;
+}
+.s-best{
+  font-size:clamp(10px,2.8vw,14px);
+  letter-spacing:4px;color:var(--mid);
+  font-family:'Courier New',monospace;
+  margin-top:4px;
+}
+.s-newbest{
+  font-size:clamp(11px,3vw,15px);
+  letter-spacing:5px;color:var(--red);
+  font-family:'Courier New',monospace;
+  animation:blink .5s step-end infinite;
+  margin-top:4px;
+}
+.s-btn{
+  margin-top:24px;
+  font-family:'Impact','Arial Narrow',sans-serif;
+  font-size:clamp(16px,5vw,24px);
+  letter-spacing:4px;text-transform:uppercase;
+  background:var(--white);color:var(--black);
+  border:none;cursor:pointer;
+  padding:14px 48px;
+  transition:background .1s,color .1s;
+}
+.s-btn:hover,.s-btn:active{background:var(--red);color:var(--white);}
+.s-instruct{
+  margin-top:20px;
+  font-size:clamp(9px,2.2vw,11px);
+  letter-spacing:3px;color:var(--mid);
+  font-family:'Courier New',monospace;
+  text-align:center;line-height:2;
+}
+
+/* Beat indicator bar */
+#beat-bar{
+  position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:min(400px,100vw);
+  height:6px;background:var(--grey);
+  display:none;z-index:10;overflow:hidden;
+}
+#beat-fill{height:100%;background:var(--white);width:0%;transition:width 0s;}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="hud-inner">
+      <div class="hud-box" id="hud-score">
+        <div class="hud-label">Score</div>
+        <div class="hud-val" id="v-score">0</div>
+      </div>
+      <div class="hud-box" id="hud-combo">
+        <div class="hud-label">Chain</div>
+        <div class="hud-val" id="v-combo">×1</div>
+      </div>
+      <div class="hud-box">
+        <div class="hud-label">Lives</div>
+        <div class="hud-val" id="v-lives">■■■</div>
+      </div>
+    </div>
+  </div>
+  <div id="miss-flash"></div>
+
+  <!-- Start screen -->
+  <div class="screen" id="startScr">
+    <div class="s-title">PUL<br>SE</div>
+    <div class="s-rule"></div>
+    <div class="s-sub">TAP THE TILES<br>DON'T MISS THE BEAT</div>
+    <div class="s-instruct">CLICK · TOUCH · KEYBOARD 1 2 3 4</div>
+    <button class="s-btn" id="startBtn">START</button>
+    <div class="s-best" id="startBest"></div>
+  </div>
+
+  <!-- Game over screen -->
+  <div class="screen" id="goScr" style="display:none">
+    <div class="s-title" style="color:var(--red)">DEAD<br>DROP</div>
+    <div class="s-rule" style="background:var(--red)"></div>
+    <div class="s-score-label">Final Score</div>
+    <div class="s-score" id="goScore">0</div>
+    <div class="s-best" id="goBest"></div>
+    <div class="s-newbest" id="goNew" style="display:none">NEW RECORD</div>
+    <button class="s-btn" id="retryBtn">RETRY</button>
+  </div>
+
+  <div id="beat-bar"><div id="beat-fill"></div></div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+
+// ── CANVAS SETUP ──────────────────────────────────────────────
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const COLS = 4;
+let W, H, CW, TH, LAND_Y; // CW=col width, TH=tile height, LAND_Y=tap zone top
+
+function resize() {
+  const maxW = 400;
+  W = Math.min(window.innerWidth, maxW);
+  H = window.innerHeight;
+  cv.width = W; cv.height = H;
+  CW = W / COLS;
+  TH = Math.round(CW * 0.72);
+  LAND_Y = H - TH - 10;
+  document.getElementById('beat-bar').style.width = W + 'px';
+}
+resize();
+window.addEventListener('resize', () => { resize(); if (state === ST.PLAY) layoutTapZone(); });
+
+// ── AUDIO ENGINE ──────────────────────────────────────────────
+let AC = null;
+function getAC() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+
+// Kick drum
+function sfxKick() {
+  try {
+    const a = getAC(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = 'sine'; o.frequency.setValueAtTime(160, a.currentTime);
+    o.frequency.exponentialRampToValueAtTime(40, a.currentTime + 0.15);
+    g.gain.setValueAtTime(0.7, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.2);
+    o.start(); o.stop(a.currentTime + 0.2);
+  } catch(e){}
+}
+// Hi-hat
+function sfxHat(vol=0.18) {
+  try {
+    const a = getAC(), buf = a.createBuffer(1,a.sampleRate*0.05,a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+    const src = a.createBufferSource(), g = a.createGain();
+    const hp = a.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=8000;
+    src.buffer=buf; src.connect(hp); hp.connect(g); g.connect(a.destination);
+    g.gain.setValueAtTime(vol,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+0.06);
+    src.start(); src.stop(a.currentTime+0.06);
+  } catch(e){}
+}
+// Hit tone (pitched per column)
+const COL_NOTES = [261, 330, 392, 523]; // C E G C
+function sfxHit(col) {
+  try {
+    const a = getAC(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = 'triangle'; o.frequency.value = COL_NOTES[col] || 330;
+    g.gain.setValueAtTime(0.3, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.12);
+    o.start(); o.stop(a.currentTime + 0.12);
+  } catch(e){}
+}
+// Miss buzz
+function sfxMiss() {
+  try {
+    const a = getAC(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = 'sawtooth'; o.frequency.value = 80;
+    g.gain.setValueAtTime(0.2, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.15);
+    o.start(); o.stop(a.currentTime + 0.15);
+  } catch(e){}
+}
+// Level up chord
+function sfxLevelUp() {
+  [261,330,392,523].forEach((f,i) => {
+    try {
+      setTimeout(()=>{
+        const a=getAC(),o=a.createOscillator(),g=a.createGain();
+        o.connect(g);g.connect(a.destination);
+        o.type='triangle';o.frequency.value=f;
+        g.gain.setValueAtTime(0.15,a.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+0.2);
+        o.start();o.stop(a.currentTime+0.2);
+      }, i*60);
+    } catch(e){}
+  });
+}
+
+// ── BEAT CLOCK ────────────────────────────────────────────────
+// BPM increases with score. Tiles spawn on beats.
+let bpm = 80, beatInterval, beatTimer = 0, beatPhase = 0;
+function calcBeatInterval() { beatInterval = 60000 / bpm; }
+calcBeatInterval();
+
+// ── STATE ─────────────────────────────────────────────────────
+const ST = { IDLE: 0, PLAY: 1, DEAD: 2 };
+let state = ST.IDLE;
+let score = 0, combo = 0, lives = 3, level = 1, hi = 0;
+try { hi = parseInt(localStorage.getItem('pulseHi') || '0'); } catch(e) {}
+
+// ── GAME OBJECTS ─────────────────────────────────────────────
+let tiles = [];       // falling tiles
+let effects = [];     // hit/miss visual pops
+let bgPulse = 0;      // background flash on beat
+let shakeT = 0;
+let pendingCols = []; // queue of columns to spawn next beat
+let patternStep = 0;
+
+// Beat patterns (sequences of column sets per beat)
+// Each entry = array of cols to light on that beat, null = rest
+const PATTERNS = [
+  // Simple alternating
+  [[0],[2],[1],[3],[0,2],[1,3]],
+  // Cascade
+  [[0],[1],[2],[3],[3],[2],[1],[0]],
+  // Syncopated
+  [[0,3],[null],[1],[2],[null],[0,3],[1,2],],
+  // Dense
+  [[0],[1],[2],[3],[0,1],[2,3],[0,2],[1,3]],
+  // Double hits
+  [[0,1],[null],[2,3],[null],[0,2],[null],[1,3],[null]],
+];
+let currentPattern = PATTERNS[0];
+let patternBeat = 0;
+
+function initGame() {
+  score = 0; combo = 0; lives = 3; level = 1; bpm = 80;
+  tiles = []; effects = []; bgPulse = 0; shakeT = 0;
+  beatTimer = 0; beatPhase = 0; patternBeat = 0;
+  calcBeatInterval();
+  currentPattern = PATTERNS[0];
+  updateHUD();
+  layoutTapZone();
+}
+
+// ── TAP ZONE RECTS ────────────────────────────────────────────
+let zones = []; // {x,y,w,h,col,pressed}
+function layoutTapZone() {
+  zones = [];
+  for (let c = 0; c < COLS; c++) {
+    zones.push({ x: c * CW, y: LAND_Y, w: CW, h: TH, col: c, pressed: false });
+  }
+}
+layoutTapZone();
+
+// ── TILE SPAWNING ─────────────────────────────────────────────
+function spawnTile(col) {
+  tiles.push({
+    col, x: col * CW, y: -TH,
+    w: CW, h: TH,
+    speed: 3.5 + level * 0.4 + (bpm - 80) * 0.015,
+    hit: false, missed: false,
+    flash: 0,
+    id: Math.random()
+  });
+}
+
+function onBeat() {
+  sfxHat(0.12);
+  bgPulse = 1;
+
+  // Pattern-driven spawning
+  const entry = currentPattern[patternBeat % currentPattern.length];
+  patternBeat++;
+
+  if (entry) {
+    entry.forEach(col => { if (col !== null) spawnTile(col); });
+  }
+
+  // Kick on downbeats
+  if (patternBeat % 4 === 1) sfxKick();
+
+  // Update beat fill bar
+  beatPhase = 0;
+}
+
+// ── INPUT ─────────────────────────────────────────────────────
+const keyCols = { 'Digit1': 0, 'KeyZ': 0, 'Digit2': 1, 'KeyX': 1, 'Digit3': 2, 'KeyC': 2, 'Digit4': 3, 'KeyV': 3 };
+document.addEventListener('keydown', e => {
+  if (e.code in keyCols) { e.preventDefault(); if (state === ST.PLAY) tapCol(keyCols[e.code]); }
+  if ((e.code === 'Space' || e.code === 'Enter') && state === ST.IDLE) startGame();
+});
+
+cv.addEventListener('click', e => { if (state === ST.IDLE) startGame(); });
+
+cv.addEventListener('pointerdown', e => {
+  if (state !== ST.PLAY) return;
+  e.preventDefault();
+  const rect = cv.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  // Which column?
+  const col = Math.floor(x / CW);
+  if (col >= 0 && col < COLS) {
+    zones[col].pressed = true;
+    setTimeout(() => { if (zones[col]) zones[col].pressed = false; }, 120);
+    tapCol(col);
+  }
+}, { passive: false });
+
+cv.addEventListener('touchstart', e => {
+  if (state !== ST.PLAY) return;
+  e.preventDefault();
+  const rect = cv.getBoundingClientRect();
+  for (let t of e.changedTouches) {
+    const x = t.clientX - rect.left;
+    const col = Math.floor(x / CW);
+    if (col >= 0 && col < COLS) {
+      zones[col].pressed = true;
+      setTimeout(() => { if (zones[col]) zones[col].pressed = false; }, 120);
+      tapCol(col);
+    }
+  }
+}, { passive: false });
+
+function tapCol(col) {
+  // Find the lowest tile in this column that's in the tap window
+  const WINDOW_TOP = LAND_Y - TH * 1.8;
+  let best = null, bestY = -Infinity;
+  for (const t of tiles) {
+    if (t.col !== col || t.hit || t.missed) continue;
+    if (t.y + t.h >= WINDOW_TOP && t.y <= LAND_Y + TH) {
+      if (t.y > bestY) { bestY = t.y; best = t; }
+    }
+  }
+  if (best) {
+    best.hit = true;
+    const pts = 100 * Math.max(1, combo);
+    score += pts;
+    combo++;
+    // Speed up BPM with score
+    const newLevel = 1 + Math.floor(score / 2000);
+    if (newLevel > level) {
+      level = newLevel; sfxLevelUp();
+      bpm = Math.min(160, 80 + (level - 1) * 8);
+      calcBeatInterval();
+      // Rotate pattern
+      currentPattern = PATTERNS[(level - 1) % PATTERNS.length];
+      patternBeat = 0;
+    }
+    sfxHit(col);
+    spawnHitEffect(best.x + best.w / 2, LAND_Y + TH / 2, true, col);
+    updateHUD();
+  } else {
+    // Tapped empty — no penalty, just visual
+    spawnHitEffect(col * CW + CW / 2, LAND_Y + TH / 2, false, col);
+  }
+}
+
+function missedTile(tile) {
+  tile.missed = true;
+  lives--;
+  combo = 0;
+  sfxMiss();
+  spawnHitEffect(tile.x + tile.w / 2, LAND_Y, false, tile.col);
+  triggerMissFlash();
+  shakeT = 300;
+  updateHUD();
+  if (lives <= 0) setTimeout(endGame, 400);
+}
+
+function triggerMissFlash() {
+  const el = document.getElementById('miss-flash');
+  el.style.opacity = '0.35';
+  setTimeout(() => el.style.opacity = '0', 120);
+}
+
+function spawnHitEffect(x, y, hit, col) {
+  effects.push({ x, y, hit, col, life: 1, scale: 1 });
+}
+
+// ── UPDATE ────────────────────────────────────────────────────
+let last = performance.now(), dt = 0;
+
+function update(now) {
+  dt = Math.min(now - last, 50); last = now;
+
+  if (state !== ST.PLAY) return;
+
+  // Beat clock
+  beatTimer += dt;
+  beatPhase = beatTimer / beatInterval;
+  if (beatTimer >= beatInterval) {
+    beatTimer -= beatInterval;
+    onBeat();
+  }
+
+  // Update beat fill bar
+  document.getElementById('beat-fill').style.width = (beatPhase * 100) + '%';
+
+  // Move tiles
+  for (let i = tiles.length - 1; i >= 0; i--) {
+    const t = tiles[i];
+    if (t.hit) { t.flash += dt * 0.01; tiles.splice(i, 1); continue; }
+    t.y += t.speed;
+    // Missed: tile passed the zone
+    if (!t.missed && t.y > LAND_Y + TH * 0.5) missedTile(t);
+    // Remove off screen
+    if (t.y > H + 20) tiles.splice(i, 1);
+  }
+
+  // Effects
+  effects.forEach(e => { e.life -= dt * 0.006; e.scale += dt * 0.004; e.y -= dt * 0.08; });
+  effects = effects.filter(e => e.life > 0);
+
+  bgPulse = Math.max(0, bgPulse - dt * 0.008);
+  if (shakeT > 0) shakeT -= dt;
+}
+
+// ── HUD ───────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('v-score').textContent = score.toLocaleString();
+  document.getElementById('v-combo').textContent = '×' + combo;
+  const livesTxt = '■'.repeat(lives) + '□'.repeat(Math.max(0, 3 - lives));
+  document.getElementById('v-lives').textContent = livesTxt;
+}
+
+// ── SCREENS ───────────────────────────────────────────────────
+const startScr = document.getElementById('startScr');
+const goScr = document.getElementById('goScr');
+const hudEl = document.getElementById('hud');
+const beatBarEl = document.getElementById('beat-bar');
+
+function showScreen(s) {
+  startScr.style.display = s === 'start' ? 'flex' : 'none';
+  goScr.style.display = s === 'go' ? 'flex' : 'none';
+  hudEl.style.display = s === 'game' ? 'block' : 'none';
+  beatBarEl.style.display = s === 'game' ? 'block' : 'none';
+}
+
+function startGame() {
+  getAC();
+  initGame();
+  state = ST.PLAY;
+  showScreen('game');
+  last = performance.now();
+}
+
+function endGame() {
+  state = ST.DEAD;
+  const newBest = score > hi;
+  if (newBest) { hi = score; try { localStorage.setItem('pulseHi', hi); } catch(e) {} }
+  document.getElementById('goScore').textContent = score.toLocaleString();
+  document.getElementById('goBest').textContent = 'BEST  ' + hi.toLocaleString();
+  document.getElementById('goNew').style.display = newBest ? 'block' : 'none';
+  showScreen('go');
+}
+
+function updateStartBest() {
+  document.getElementById('startBest').textContent = hi > 0 ? 'BEST  ' + hi.toLocaleString() : '';
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+
+showScreen('start');
+updateStartBest();
+
+// ── DRAW ──────────────────────────────────────────────────────
+// Column shades (alternating) — stark brutalist
+const COL_SHADES = ['#101010', '#161616', '#101010', '#161616'];
+const COL_ACCENTS = ['#f2f2f2', '#cccccc', '#f2f2f2', '#cccccc'];
+
+function drawBg() {
+  // Columns
+  for (let c = 0; c < COLS; c++) {
+    ctx.fillStyle = COL_SHADES[c];
+    ctx.fillRect(c * CW, 0, CW, H);
+  }
+  // Beat pulse overlay
+  if (bgPulse > 0) {
+    ctx.fillStyle = `rgba(242,242,242,${bgPulse * 0.06})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // Dividers
+  ctx.fillStyle = '#222';
+  for (let c = 1; c < COLS; c++) {
+    ctx.fillRect(c * CW - 1, 0, 2, H);
+  }
+}
+
+function drawLane() {
+  // Tap zone background
+  for (let c = 0; c < COLS; c++) {
+    const z = zones[c];
+    const pressed = z && z.pressed;
+    ctx.fillStyle = pressed ? '#2a2a2a' : '#111';
+    ctx.fillRect(z.x, z.y, z.w - 2, z.h);
+    // Zone border — thick top line
+    ctx.fillStyle = pressed ? '#ffffff' : '#333';
+    ctx.fillRect(z.x, z.y, z.w - 2, 3);
+    // Column number hint
+    ctx.fillStyle = '#2a2a2a';
+    ctx.font = `bold ${Math.round(CW * 0.22)}px Impact`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c + 1, z.x + z.w / 2, z.y + z.h / 2);
+  }
+  // Hit line glow
+  const lineY = LAND_Y + 1;
+  const lineGrad = ctx.createLinearGradient(0, lineY, W, lineY);
+  lineGrad.addColorStop(0, '#f2f2f2');
+  lineGrad.addColorStop(0.5, '#ffffff');
+  lineGrad.addColorStop(1, '#f2f2f2');
+  ctx.fillStyle = lineGrad;
+  ctx.fillRect(0, lineY - 1, W, 4);
+}
+
+function drawTile(t) {
+  // Draw tile body
+  const margin = 3;
+  const tx = t.x + margin, ty = t.y, tw = t.w - margin * 2 - 1, th = t.h - margin;
+
+  ctx.fillStyle = COL_ACCENTS[t.col];
+  ctx.fillRect(tx, ty, tw, th);
+
+  // Dark inset
+  const ins = 5;
+  ctx.fillStyle = '#080808';
+  ctx.fillRect(tx + ins, ty + ins, tw - ins * 2, th - ins * 2);
+
+  // White top edge
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(tx, ty, tw, ins);
+
+  // Beat proximity: highlight when near zone
+  const prox = Math.max(0, 1 - Math.abs((t.y + t.h / 2) - (LAND_Y + TH / 2)) / (H * 0.35));
+  if (prox > 0.3) {
+    ctx.fillStyle = `rgba(255,255,255,${prox * 0.15})`;
+    ctx.fillRect(tx, ty, tw, th);
+    // Side pulses
+    ctx.fillStyle = `rgba(255,255,255,${prox * 0.6})`;
+    ctx.fillRect(tx, ty + ins, ins * 0.7, th - ins * 2);
+    ctx.fillRect(tx + tw - ins * 0.7, ty + ins, ins * 0.7, th - ins * 2);
+  }
+}
+
+function drawEffects() {
+  effects.forEach(e => {
+    ctx.save();
+    ctx.globalAlpha = e.life * 0.9;
+    if (e.hit) {
+      // Big white flash rectangle
+      const sz = CW * e.scale * 0.9;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(e.x - sz / 2, e.y - sz / 2, sz, sz * 0.35);
+      // "NICE" / chain text
+      ctx.fillStyle = combo > 4 ? '#e8002d' : '#ffffff';
+      ctx.font = `bold ${Math.round(CW * 0.28 * e.scale)}px Impact`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const label = combo > 8 ? 'FIRE' : combo > 4 ? 'CHAIN' : 'HIT';
+      ctx.fillText(label, e.x, e.y - CW * 0.2 * e.scale);
+    } else {
+      // Miss X
+      ctx.strokeStyle = '#e8002d';
+      ctx.lineWidth = 4 * e.scale;
+      const s = CW * 0.18 * e.scale;
+      ctx.beginPath();
+      ctx.moveTo(e.x - s, e.y - s); ctx.lineTo(e.x + s, e.y + s);
+      ctx.moveTo(e.x + s, e.y - s); ctx.lineTo(e.x - s, e.y + s);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+// Beat counter visual (top of screen)
+function drawBeatDots() {
+  const beats = 4;
+  const dotR = 5;
+  const spacing = 22;
+  const totalW = (beats - 1) * spacing;
+  const startX = W / 2 - totalW / 2;
+  const y = 6 + dotR;
+  for (let i = 0; i < beats; i++) {
+    const active = (patternBeat % beats) === i;
+    ctx.beginPath();
+    ctx.arc(startX + i * spacing, y, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = active ? '#ffffff' : '#2a2a2a';
+    ctx.fill();
+  }
+}
+
+// ── LOOP ──────────────────────────────────────────────────────
+function loop(now) {
+  update(now);
+  ctx.save();
+  if (shakeT > 0) {
+    const m = Math.min(6, shakeT / 50);
+    ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+  }
+  drawBg();
+  if (state === ST.PLAY) {
+    drawLane();
+    tiles.forEach(drawTile);
+    drawEffects();
+    drawBeatDots();
+  }
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

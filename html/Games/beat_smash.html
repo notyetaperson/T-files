@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BEAT SMASH</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --bg:      #0a0a0f;
+  --bg2:     #12121a;
+  --col0:    #ff4466;
+  --col1:    #ffcc00;
+  --col2:    #44ddff;
+  --col3:    #88ff44;
+  --white:   #e8e8f0;
+  --dim:     #3a3a55;
+  --perfect: #ffffff;
+  --good:    #88ff44;
+  --ok:      #ffcc00;
+  --miss:    #ff4466;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  width:100%; height:100%;
+  background: var(--bg);
+  font-family: 'Press Start 2P', monospace;
+  overflow: hidden;
+  touch-action: none;
+  image-rendering: pixelated;
+}
+
+/* Pixel dither scanlines */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 1px,
+    rgba(0,0,0,0.18) 1px, rgba(0,0,0,0.18) 2px
+  );
+  pointer-events:none;
+  z-index:999;
+}
+
+#app {
+  width:100%; height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  position:relative;
+}
+
+/* ── HUD ── */
+#hud {
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:8px 12px 6px;
+  background: var(--bg2);
+  border-bottom: 3px solid var(--dim);
+  flex-shrink:0;
+  position:relative;
+  z-index:10;
+}
+
+.hud-box {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+
+.hud-lbl {
+  font-size:6px;
+  letter-spacing:2px;
+  color: var(--dim);
+  text-transform:uppercase;
+}
+
+.hud-val {
+  font-size:clamp(11px,3vw,16px);
+  color: var(--white);
+  text-shadow: 2px 2px 0 #000;
+}
+
+#comboVal { color: var(--col1); text-shadow: 2px 2px 0 #000, 0 0 12px var(--col1); }
+#scoreVal { color: var(--col2); text-shadow: 2px 2px 0 #000, 0 0 10px var(--col2); }
+
+/* HP bar */
+#hpBar {
+  width:90px;
+  height:10px;
+  background: #1a1a28;
+  border: 2px solid var(--dim);
+  position:relative;
+  image-rendering:pixelated;
+}
+#hpFill {
+  height:100%;
+  background: var(--col0);
+  transition: width 0.1s;
+  box-shadow: 0 0 6px var(--col0);
+}
+
+/* ── CANVAS ── */
+#gameCanvas {
+  display:block;
+  flex:1;
+  width:100%;
+  image-rendering:pixelated;
+}
+
+/* ── TOUCH BUTTONS ── */
+#touchRow {
+  width:100%;
+  display:none;
+  flex-shrink:0;
+  background: var(--bg2);
+  border-top: 3px solid var(--dim);
+}
+
+.touch-btn {
+  flex:1;
+  height:72px;
+  border:none;
+  border-right: 2px solid var(--bg);
+  background: transparent;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Press Start 2P', monospace;
+  font-size:20px;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  transition: background 0.05s;
+  position:relative;
+  overflow:hidden;
+}
+.touch-btn:last-child { border-right:none; }
+.touch-btn::before {
+  content:'';
+  position:absolute; inset:0;
+  background: currentColor;
+  opacity:0;
+  transition: opacity 0.05s;
+}
+.touch-btn.lit::before { opacity:0.25; }
+
+#tb0 { color: var(--col0); }
+#tb1 { color: var(--col1); }
+#tb2 { color: var(--col2); }
+#tb3 { color: var(--col3); }
+
+/* ── SCREENS ── */
+.screen {
+  position:absolute; inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  padding:20px;
+  z-index:50;
+  background: rgba(10,10,15,0.96);
+}
+
+.px-title {
+  font-size:clamp(22px,8vw,48px);
+  color: var(--white);
+  text-shadow: 4px 4px 0 var(--col0), 8px 8px 0 #000;
+  letter-spacing:4px;
+  text-align:center;
+  line-height:1.4;
+  animation: titleBob 1.6s ease-in-out infinite;
+}
+
+@keyframes titleBob {
+  0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)}
+}
+
+.px-sub {
+  font-size:7px;
+  letter-spacing:3px;
+  color: var(--col2);
+  text-shadow: 1px 1px 0 #000;
+  text-align:center;
+}
+
+.key-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:6px;
+}
+
+.key-block {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background: var(--bg2);
+  border: 2px solid var(--dim);
+  padding:8px 12px;
+  font-size:7px;
+  color: var(--white);
+}
+
+.key-chip {
+  display:inline-block;
+  padding:3px 7px;
+  border: 2px solid;
+  font-size:8px;
+  text-shadow:1px 1px 0 #000;
+}
+
+.diff-btns {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+.diff-btn {
+  font-family:'Press Start 2P', monospace;
+  font-size:8px;
+  letter-spacing:2px;
+  padding:10px 16px;
+  border: 3px solid;
+  background:transparent;
+  cursor:pointer;
+  text-transform:uppercase;
+  transition: all 0.1s;
+  text-shadow:1px 1px 0 #000;
+}
+.diff-btn:hover, .diff-btn.selected {
+  background: currentColor;
+  color: var(--bg) !important;
+}
+.diff-btn:active { transform:scale(0.95); }
+
+#dbEasy   { color:var(--col3); border-color:var(--col3); }
+#dbNormal { color:var(--col1); border-color:var(--col1); }
+#dbHard   { color:var(--col0); border-color:var(--col0); }
+
+.tap-to-start {
+  font-size:9px;
+  letter-spacing:3px;
+  color: var(--col1);
+  text-shadow:1px 1px 0 #000, 0 0 10px var(--col1);
+  animation: blink 1s step-end infinite;
+  text-align:center;
+}
+@keyframes blink {0%,100%{opacity:1}50%{opacity:0}}
+
+.go-title {
+  font-size:clamp(20px,7vw,40px);
+  text-align:center;
+  text-shadow:4px 4px 0 #000;
+  letter-spacing:3px;
+}
+
+.result-row {
+  display:flex;
+  justify-content:space-between;
+  width:min(320px,90%);
+  font-size:8px;
+  color: var(--white);
+  padding:6px 0;
+  border-bottom:2px solid var(--dim);
+}
+.result-row span:last-child { color: var(--col2); }
+
+.grade-big {
+  font-size:clamp(40px,14vw,80px);
+  text-shadow:4px 4px 0 #000;
+  animation: titleBob 1s ease-in-out infinite;
+}
+
+.px-btn {
+  font-family:'Press Start 2P', monospace;
+  font-size:9px;
+  letter-spacing:2px;
+  padding:12px 24px;
+  border:3px solid var(--col2);
+  color:var(--col2);
+  background:transparent;
+  cursor:pointer;
+  text-transform:uppercase;
+  text-shadow:1px 1px 0 #000;
+  transition:all 0.1s;
+  margin-top:8px;
+}
+.px-btn:hover { background:var(--col2); color:var(--bg); }
+.px-btn:active { transform:scale(0.95); }
+
+#pauseScreen { display:none; }
+#gameOverScreen { display:none; }
+
+/* Judge text floating */
+#judgeText {
+  position:absolute;
+  left:50%;
+  pointer-events:none;
+  z-index:40;
+  font-family:'Press Start 2P', monospace;
+  font-size:clamp(13px,4vw,20px);
+  letter-spacing:2px;
+  text-shadow:2px 2px 0 #000;
+  opacity:0;
+  transform:translateX(-50%);
+  transition:none;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-box">
+      <div class="hud-lbl">Score</div>
+      <div class="hud-val" id="scoreVal">0</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-lbl">Life</div>
+      <div id="hpBar"><div id="hpFill" style="width:100%"></div></div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-lbl">Combo</div>
+      <div class="hud-val" id="comboVal">×0</div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-lbl">Best</div>
+      <div class="hud-val" id="bestVal">0</div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Touch buttons -->
+  <div id="touchRow">
+    <button class="touch-btn" id="tb0">▼</button>
+    <button class="touch-btn" id="tb1">▼</button>
+    <button class="touch-btn" id="tb2">▼</button>
+    <button class="touch-btn" id="tb3">▼</button>
+  </div>
+
+  <div id="judgeText"></div>
+
+  <!-- START SCREEN -->
+  <div class="screen" id="startScreen">
+    <div class="px-title">BEAT<br>SMASH</div>
+    <div class="px-sub">— PIXEL RHYTHM —</div>
+
+    <div class="diff-btns">
+      <button class="diff-btn" id="dbEasy"   onclick="selectDiff('easy')">EASY</button>
+      <button class="diff-btn selected" id="dbNormal" onclick="selectDiff('normal')">NORMAL</button>
+      <button class="diff-btn" id="dbHard"   onclick="selectDiff('hard')">HARD</button>
+    </div>
+
+    <div class="key-grid">
+      <div class="key-block">
+        <span class="key-chip" style="color:var(--col0);border-color:var(--col0)">D</span>
+        <span style="color:var(--col0)">Lane 1</span>
+      </div>
+      <div class="key-block">
+        <span class="key-chip" style="color:var(--col1);border-color:var(--col1)">F</span>
+        <span style="color:var(--col1)">Lane 2</span>
+      </div>
+      <div class="key-block">
+        <span class="key-chip" style="color:var(--col2);border-color:var(--col2)">J</span>
+        <span style="color:var(--col2)">Lane 3</span>
+      </div>
+      <div class="key-block">
+        <span class="key-chip" style="color:var(--col3);border-color:var(--col3)">K</span>
+        <span style="color:var(--col3)">Lane 4</span>
+      </div>
+    </div>
+
+    <div class="tap-to-start">▶ TAP / PRESS ENTER ◀</div>
+  </div>
+
+  <!-- PAUSE -->
+  <div class="screen" id="pauseScreen">
+    <div class="px-title" style="color:var(--col1)">PAUSED</div>
+    <div class="px-sub">PRESS P OR TAP TO RESUME</div>
+    <button class="px-btn" onclick="resumeGame()" style="border-color:var(--col1);color:var(--col1)">RESUME</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen" id="gameOverScreen">
+    <div class="go-title" id="goTitle">GAME OVER</div>
+    <div class="grade-big" id="gradeDisplay">C</div>
+    <div style="width:min(320px,90%);margin-top:4px;">
+      <div class="result-row"><span>SCORE</span><span id="goScore">0</span></div>
+      <div class="result-row"><span>BEST</span><span id="goBest">0</span></div>
+      <div class="result-row"><span>PERFECT</span><span id="goPerf">0</span></div>
+      <div class="result-row"><span>GOOD</span><span id="goGood">0</span></div>
+      <div class="result-row"><span>OK</span><span id="goOk">0</span></div>
+      <div class="result-row"><span>MISS</span><span id="goMiss">0</span></div>
+      <div class="result-row"><span>MAX COMBO</span><span id="goCombo">0</span></div>
+    </div>
+    <div id="newRecordBadge" style="display:none;font-size:9px;color:var(--col1);text-shadow:0 0 10px var(--col1);letter-spacing:3px;animation:blink 0.5s step-end infinite;">★ NEW RECORD ★</div>
+    <button class="px-btn" id="btnAgain">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// AUDIO ENGINE
+// ═══════════════════════════════════════════════
+let actx = null;
+function initAudio() {
+  if (!actx) try { actx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+}
+
+function beep(freq, type='square', dur=0.08, vol=0.25, delay=0) {
+  if (!actx) return;
+  try {
+    const g = actx.createGain();
+    const o = actx.createOscillator();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, actx.currentTime+delay);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime+delay+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(actx.currentTime+delay);
+    o.stop(actx.currentTime+delay+dur);
+  } catch(e){}
+}
+
+const LANE_FREQS = [220, 330, 440, 550];
+
+function sfxHit(lane, judge) {
+  const f = LANE_FREQS[lane];
+  const vols = {perfect:0.35, good:0.28, ok:0.2};
+  beep(f, 'square', 0.09, vols[judge]||0.15);
+  if (judge === 'perfect') beep(f*2, 'sine', 0.07, 0.12);
+}
+
+function sfxMiss() { beep(110, 'sawtooth', 0.15, 0.3); }
+
+function sfxComboBreak() {
+  beep(200, 'sawtooth', 0.1, 0.3);
+  beep(150, 'sawtooth', 0.1, 0.25, 0.08);
+}
+
+function sfxLevelUp() {
+  [523,659,784].forEach((f,i)=>beep(f,'square',0.12,0.25,i*0.06));
+}
+
+function sfxGameOver() {
+  [300,250,200,150].forEach((f,i)=>beep(f,'sawtooth',0.18,0.3,i*0.09));
+}
+
+function sfxMenuClick() { beep(440,'square',0.06,0.2); }
+
+// Beat pattern generator (plays in background for rhythm feel)
+let beatInterval = null;
+const BPM = 130;
+const BEAT_MS = 60000/BPM;
+
+function startBeatTrack() {
+  stopBeatTrack();
+  let beat = 0;
+  beatInterval = setInterval(() => {
+    if (gameState !== 'playing') return;
+    const b = beat % 8;
+    // Kick on 0,4; snare on 2,6; hihat all
+    if (b===0||b===4) beep(80,'square',0.12,0.2);         // kick
+    if (b===2||b===6) beep(200,'sawtooth',0.08,0.18);     // snare
+    beep(1400,'square',0.04,0.06);                         // hihat
+    beat++;
+  }, BEAT_MS/2);
+}
+
+function stopBeatTrack() {
+  if (beatInterval) { clearInterval(beatInterval); beatInterval=null; }
+}
+
+// ═══════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+let W, H, LANE_W, HIT_Y, NOTE_H;
+const LANES = 4;
+const COLORS = ['#ff4466','#ffcc00','#44ddff','#88ff44'];
+const DARK   = ['#661122','#554400','#115566','#224411'];
+
+function resize() {
+  const hudH = document.getElementById('hud').offsetHeight;
+  const isMobile = window.innerWidth < 600 || 'ontouchstart' in window;
+  const touchH = isMobile ? 72+3 : 0;
+
+  W = window.innerWidth;
+  H = window.innerHeight - hudH - touchH;
+
+  canvas.width  = W;
+  canvas.height = H;
+
+  LANE_W = Math.floor(W / LANES);
+  HIT_Y  = H - Math.floor(H * 0.15);
+  NOTE_H = Math.max(16, Math.floor(H * 0.045));
+
+  const tr = document.getElementById('touchRow');
+  if (isMobile) tr.style.display='flex';
+}
+
+// ═══════════════════════════════════════════════
+// DIFFICULTY / SETTINGS
+// ═══════════════════════════════════════════════
+const DIFFS = {
+  easy:   { spawnRate:1800, speed:0.28, hitWindow:{perfect:80,good:140,ok:200}, hpDrain:8,  hpGain:3 },
+  normal: { spawnRate:1100, speed:0.38, hitWindow:{perfect:60,good:110,ok:170}, hpDrain:14, hpGain:2 },
+  hard:   { spawnRate:700,  speed:0.52, hitWindow:{perfect:45,good:80, ok:130}, hpDrain:20, hpGain:1 },
+};
+
+let chosenDiff = 'normal';
+
+function selectDiff(d) {
+  chosenDiff = d;
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('db'+d.charAt(0).toUpperCase()+d.slice(1)).classList.add('selected');
+  sfxMenuClick();
+}
+
+// ═══════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════
+let gameState = 'start';
+let notes, particles, laneFlash, lanePress;
+let score, combo, maxCombo, hp, hpMax;
+let stats; // {perfect,good,ok,miss}
+let spawnTimer, noteSpeed, spawnInterval;
+let lastTime, elapsed;
+let highScore;
+let frameId;
+let barPulse;
+let diff;
+
+function loadHS() {
+  highScore = parseInt(localStorage.getItem('beatSmashHS')||'0');
+  document.getElementById('bestVal').textContent = highScore;
+}
+function saveHS(s) {
+  if (s > highScore) { highScore=s; localStorage.setItem('beatSmashHS',s); }
+}
+
+function initGame() {
+  diff = DIFFS[chosenDiff];
+  notes     = [];
+  particles = [];
+  laneFlash = [0,0,0,0];
+  lanePress = [false,false,false,false];
+  score  = 0; combo = 0; maxCombo = 0;
+  hp = hpMax = 100;
+  stats  = {perfect:0, good:0, ok:0, miss:0};
+  spawnTimer = 0;
+  spawnInterval = diff.spawnRate;
+  noteSpeed  = diff.speed; // px per ms
+  elapsed    = 0;
+  barPulse   = 0;
+  updateHUD();
+}
+
+// ═══════════════════════════════════════════════
+// NOTE SYSTEM
+// ═══════════════════════════════════════════════
+function spawnNote() {
+  const lane = Math.floor(Math.random()*LANES);
+  notes.push({
+    lane,
+    y: -NOTE_H,
+    hit: false,
+    missed: false,
+    alpha: 1,
+  });
+}
+
+function spawnBurst(x, y, color, count=10) {
+  for (let i=0;i<count;i++) {
+    const a = (Math.PI*2/count)*i + Math.random()*0.4;
+    const s = 1.5+Math.random()*3;
+    particles.push({
+      x, y,
+      vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+      color, life:1,
+      decay:0.04+Math.random()*0.04,
+      size:3+Math.random()*4,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════
+// INPUT → JUDGE
+// ═══════════════════════════════════════════════
+function pressLane(lane) {
+  if (gameState !== 'playing') return;
+  laneFlash[lane] = 1;
+  lanePress[lane] = true;
+
+  const w = diff.hitWindow;
+  // find closest note in lane within window
+  let best = null, bestDist = Infinity;
+  for (const n of notes) {
+    if (n.lane !== lane || n.hit || n.missed) continue;
+    const dist = Math.abs(n.y - HIT_Y);
+    if (dist < bestDist) { bestDist = dist; best = n; }
+  }
+
+  if (best && bestDist <= w.ok) {
+    best.hit = true;
+    let judge;
+    if (bestDist <= w.perfect) judge = 'perfect';
+    else if (bestDist <= w.good) judge = 'good';
+    else judge = 'ok';
+
+    const pts = {perfect:300, good:150, ok:50}[judge];
+    const mult = 1 + Math.floor(combo/10)*0.5;
+    score += Math.round(pts * mult);
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+    stats[judge]++;
+    hp = Math.min(hpMax, hp + diff.hpGain);
+
+    sfxHit(lane, judge);
+    showJudge(judge);
+    spawnBurst(
+      lane*LANE_W + LANE_W/2,
+      HIT_Y,
+      COLORS[lane], 12
+    );
+    updateHUD();
+  } else {
+    // Ghost hit (pressed but no note)
+    beep(LANE_FREQS[lane]*0.5,'square',0.04,0.08);
+  }
+}
+
+function releaseLane(lane) {
+  lanePress[lane] = false;
+}
+
+// Show judge text
+let judgeTimer = null;
+function showJudge(j) {
+  const el = document.getElementById('judgeText');
+  const colors = {perfect:'#ffffff', good:'#88ff44', ok:'#ffcc00', miss:'#ff4466'};
+  const texts  = {perfect:'PERFECT!', good:'GOOD', ok:'OK', miss:'MISS'};
+  el.textContent = texts[j];
+  el.style.color = colors[j];
+  el.style.top = (HIT_Y - 60 + document.getElementById('hud').offsetHeight) + 'px';
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) scale(1)';
+  el.style.transition = 'none';
+  clearTimeout(judgeTimer);
+  judgeTimer = setTimeout(()=>{
+    el.style.transition = 'opacity 0.3s, transform 0.3s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(-20px) scale(0.8)';
+  }, 350);
+}
+
+function updateHUD() {
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('comboVal').textContent = '×'+combo;
+  document.getElementById('hpFill').style.width = hp+'%';
+  document.getElementById('hpFill').style.background = hp < 30 ? '#ff4466' : hp < 60 ? '#ffcc00' : '#88ff44';
+  document.getElementById('bestVal').textContent = Math.max(score, highScore);
+}
+
+// ═══════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════
+function drawPixelRect(x, y, w, h, color, glow=false) {
+  ctx.fillStyle = color;
+  if (glow) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+  }
+  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  ctx.shadowBlur = 0;
+}
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+
+  // BG
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0,0,W,H);
+
+  // Lane backgrounds
+  for (let l=0;l<LANES;l++) {
+    const lx = l*LANE_W;
+    ctx.fillStyle = l%2===0 ? '#0e0e18' : '#0a0a12';
+    ctx.fillRect(lx, 0, LANE_W, H);
+
+    // Lane color tint at bottom
+    ctx.fillStyle = DARK[l]+'55';
+    ctx.fillRect(lx, HIT_Y - NOTE_H*1.5, LANE_W, NOTE_H*3);
+
+    // Lane dividers (pixel style)
+    ctx.fillStyle = '#1e1e2e';
+    ctx.fillRect(l*LANE_W, 0, 2, H);
+  }
+
+  // Scrolling dashes on lanes
+  const dashOff = (elapsed * noteSpeed * 0.4) % 40;
+  ctx.fillStyle = '#1a1a2a';
+  for (let l=0;l<LANES;l++) {
+    const cx = l*LANE_W + LANE_W/2 - 1;
+    for (let y=-dashOff; y<H; y+=40) {
+      ctx.fillRect(cx, y, 2, 20);
+    }
+  }
+
+  // Beat pulse line
+  const beatPhase = (elapsed % BEAT_MS) / BEAT_MS;
+  const pulseAlpha = Math.pow(1-beatPhase, 3) * 0.3;
+  ctx.fillStyle = `rgba(255,255,255,${pulseAlpha})`;
+  ctx.fillRect(0, HIT_Y - 1, W, 2);
+
+  // Hit zone
+  for (let l=0;l<LANES;l++) {
+    const lx = l*LANE_W;
+    const flash = laneFlash[l];
+    const pressed = lanePress[l];
+
+    // Outer glow when pressed
+    if (pressed) {
+      ctx.fillStyle = COLORS[l]+'33';
+      ctx.fillRect(lx+2, HIT_Y - NOTE_H, LANE_W-4, NOTE_H*2);
+    }
+
+    // Hit target — pixel frame
+    const tx = lx + 4;
+    const ty = HIT_Y - Math.floor(NOTE_H*0.6);
+    const tw = LANE_W - 8;
+    const th = Math.floor(NOTE_H*1.2);
+
+    ctx.fillStyle = flash > 0.5 ? COLORS[l] : DARK[l];
+    ctx.shadowColor = COLORS[l];
+    ctx.shadowBlur = flash > 0.5 ? 18 : 4;
+    ctx.fillRect(tx, ty, tw, th);
+
+    // Inner pixel detail
+    ctx.fillStyle = flash > 0.5 ? '#fff' : COLORS[l]+'66';
+    ctx.fillRect(tx+4, ty+3, tw-8, th-6);
+    ctx.shadowBlur = 0;
+
+    // Lane key label
+    const labels = ['D','F','J','K'];
+    ctx.fillStyle = flash > 0.5 ? '#000' : COLORS[l]+'99';
+    ctx.font = `bold ${Math.floor(NOTE_H*0.7)}px 'Press Start 2P', monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labels[l], lx+LANE_W/2, HIT_Y + NOTE_H*0.55);
+
+    laneFlash[l] = Math.max(0, laneFlash[l] - 0.15);
+  }
+
+  // Notes
+  for (const n of notes) {
+    if (n.hit || n.missed) continue;
+    const lx = n.lane*LANE_W;
+    const ny = n.y;
+
+    // Note shadow
+    ctx.fillStyle = DARK[n.lane];
+    ctx.fillRect(lx+6, ny+4, LANE_W-12, NOTE_H);
+
+    // Note body
+    ctx.fillStyle = COLORS[n.lane];
+    ctx.shadowColor = COLORS[n.lane];
+    ctx.shadowBlur = 10;
+    ctx.fillRect(lx+4, ny, LANE_W-8, NOTE_H);
+
+    // Pixel highlight
+    ctx.fillStyle = '#ffffff88';
+    ctx.fillRect(lx+6, ny+2, LANE_W-20, Math.ceil(NOTE_H*0.35));
+
+    // Arrow chevron
+    ctx.fillStyle = '#000000aa';
+    const arrowX = lx + LANE_W/2;
+    const arrowY = ny + NOTE_H/2;
+    const as = NOTE_H * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(arrowX - as, arrowY - as*0.5);
+    ctx.lineTo(arrowX, arrowY + as*0.5);
+    ctx.lineTo(arrowX + as, arrowY - as*0.5);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    const sz = Math.ceil(p.size * p.life);
+    ctx.fillRect(Math.round(p.x-sz/2), Math.round(p.y-sz/2), sz, sz);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // Combo fire effect
+  if (combo >= 10) {
+    const fireColors = combo >= 50 ? ['#ff4466','#ff8800','#ffff00'] :
+                       combo >= 20 ? ['#ff8800','#ffcc00'] : ['#ffcc00'];
+    const fireAlpha = Math.min(0.6, combo/100);
+    fireColors.forEach((c,i) => {
+      const grad = ctx.createLinearGradient(0, HIT_Y-80, 0, HIT_Y);
+      grad.addColorStop(0, c+'00');
+      grad.addColorStop(1, c + Math.round(fireAlpha*255).toString(16).padStart(2,'0'));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, HIT_Y-80, W, 80);
+    });
+  }
+
+  // Score pop when big combo
+  if (combo > 0 && combo % 10 === 0 && laneFlash.some(f=>f>0.8)) {
+    ctx.fillStyle = '#ffffff22';
+    ctx.font = `${Math.floor(H*0.12)}px 'Press Start 2P', monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('×'+combo, W/2, H/2);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════════
+function gameLoop(ts) {
+  frameId = requestAnimationFrame(gameLoop);
+
+  if (gameState !== 'playing') {
+    draw();
+    return;
+  }
+
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+  elapsed += dt;
+
+  // Spawn notes
+  spawnTimer += dt;
+  // Gradually increase spawn rate
+  spawnInterval = Math.max(
+    diff.spawnRate * 0.5,
+    diff.spawnRate - Math.floor(elapsed / 10000) * 50
+  );
+
+  if (spawnTimer >= spawnInterval) {
+    spawnTimer = 0;
+    spawnNote();
+    // Occasionally spawn 2 notes on different lanes
+    if (Math.random() < 0.25 + elapsed/120000) {
+      let lane2;
+      do { lane2 = Math.floor(Math.random()*LANES); }
+      while (lane2 === notes[notes.length-1].lane);
+      const prev = notes[notes.length-1];
+      notes.push({ lane:lane2, y:-NOTE_H, hit:false, missed:false, alpha:1 });
+    }
+  }
+
+  // Update notes
+  const speed = noteSpeed * dt * (1 + elapsed/60000*0.4);
+  for (let i=notes.length-1; i>=0; i--) {
+    const n = notes[i];
+    if (n.hit) { notes.splice(i,1); continue; }
+    n.y += speed;
+
+    // Miss detection
+    if (!n.missed && n.y > HIT_Y + NOTE_H * 2) {
+      n.missed = true;
+      stats.miss++;
+      combo = 0;
+      hp = Math.max(0, hp - diff.hpDrain);
+      sfxMiss();
+      showJudge('miss');
+      updateHUD();
+      if (hp <= 0) { endGame(); return; }
+      notes.splice(i,1);
+    }
+  }
+
+  // Update particles
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy;
+    p.vx*=0.88; p.vy*=0.88;
+    p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  draw();
+}
+
+// ═══════════════════════════════════════════════
+// GRADE CALCULATOR
+// ═══════════════════════════════════════════════
+function getGrade(sc, total) {
+  const pct = total === 0 ? 0 : sc / (total * 300);
+  if (pct >= 0.95) return {g:'S', color:'#ffffff'};
+  if (pct >= 0.85) return {g:'A', color:'#88ff44'};
+  if (pct >= 0.70) return {g:'B', color:'#44ddff'};
+  if (pct >= 0.55) return {g:'C', color:'#ffcc00'};
+  return {g:'D', color:'#ff4466'};
+}
+
+// ═══════════════════════════════════════════════
+// STATE TRANSITIONS
+// ═══════════════════════════════════════════════
+function startGame() {
+  initAudio();
+  document.getElementById('startScreen').style.display  = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('pauseScreen').style.display  = 'none';
+  initGame();
+  lastTime = null;
+  gameState = 'playing';
+  startBeatTrack();
+  if (!frameId) gameLoop(0);
+}
+
+function togglePause() {
+  if (gameState === 'playing') {
+    gameState = 'paused';
+    stopBeatTrack();
+    document.getElementById('pauseScreen').style.display = 'flex';
+  } else if (gameState === 'paused') {
+    resumeGame();
+  }
+}
+
+function resumeGame() {
+  document.getElementById('pauseScreen').style.display = 'none';
+  lastTime = null;
+  gameState = 'playing';
+  startBeatTrack();
+}
+
+function endGame() {
+  gameState = 'dead';
+  stopBeatTrack();
+  sfxGameOver();
+  saveHS(score);
+
+  const total = stats.perfect + stats.good + stats.ok + stats.miss;
+  const gr = getGrade(score, total);
+
+  document.getElementById('goTitle').textContent =
+    hp <= 0 ? 'GAME OVER' : 'STAGE CLEAR';
+  document.getElementById('goScore').textContent = score;
+  document.getElementById('goBest').textContent  = Math.max(score, highScore);
+  document.getElementById('goPerf').textContent  = stats.perfect;
+  document.getElementById('goGood').textContent  = stats.good;
+  document.getElementById('goOk').textContent    = stats.ok;
+  document.getElementById('goMiss').textContent  = stats.miss;
+  document.getElementById('goCombo').textContent = maxCombo;
+
+  const gd = document.getElementById('gradeDisplay');
+  gd.textContent  = gr.g;
+  gd.style.color  = gr.color;
+  gd.style.textShadow = `4px 4px 0 #000, 0 0 20px ${gr.color}`;
+
+  const isNew = score > highScore;
+  document.getElementById('newRecordBadge').style.display = isNew ? 'block' : 'none';
+  if (isNew) highScore = score;
+
+  setTimeout(()=>{ document.getElementById('gameOverScreen').style.display='flex'; }, 800);
+}
+
+// ═══════════════════════════════════════════════
+// INPUT WIRING
+// ═══════════════════════════════════════════════
+const KEY_LANES = {'d':0,'D':0,'f':1,'F':1,'j':2,'J':2,'k':3,'K':3};
+
+document.addEventListener('keydown', e => {
+  initAudio();
+  if (gameState === 'start') { startGame(); return; }
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { togglePause(); return; }
+  if (e.key === 'Enter' && (gameState==='dead')) { startGame(); return; }
+  if (e.key in KEY_LANES && !e.repeat) pressLane(KEY_LANES[e.key]);
+});
+
+document.addEventListener('keyup', e => {
+  if (e.key in KEY_LANES) releaseLane(KEY_LANES[e.key]);
+});
+
+// Touch buttons
+[0,1,2,3].forEach(l => {
+  const btn = document.getElementById('tb'+l);
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault(); initAudio();
+    if (gameState==='start') { startGame(); return; }
+    pressLane(l); btn.classList.add('lit');
+  }, {passive:false});
+  btn.addEventListener('touchend', e => {
+    e.preventDefault();
+    releaseLane(l); btn.classList.remove('lit');
+  }, {passive:false});
+  btn.addEventListener('mousedown', e => {
+    initAudio();
+    if (gameState==='start') { startGame(); return; }
+    pressLane(l); btn.classList.add('lit');
+  });
+  btn.addEventListener('mouseup', () => {
+    releaseLane(l); btn.classList.remove('lit');
+  });
+});
+
+// Canvas tap to start
+canvas.addEventListener('click', () => {
+  initAudio();
+  if (gameState==='start') startGame();
+  else if (gameState==='paused') resumeGame();
+});
+
+document.getElementById('startScreen').addEventListener('click', () => { initAudio(); startGame(); });
+document.getElementById('pauseScreen').addEventListener('click', () => { initAudio(); resumeGame(); });
+document.getElementById('btnAgain').addEventListener('click', () => { initAudio(); startGame(); });
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+window.addEventListener('resize', () => { resize(); });
+
+resize();
+loadHS();
+gameLoop(0);
+</script>
+</body>
+</html>
