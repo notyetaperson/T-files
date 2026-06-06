@@ -1,127 +1,92 @@
-# T-Files 📡
+# T-files 📡
 
-> A collection of scripts, tools, firmwares, and utilities for the **M5Stack T-Embed CC1101** and **T-Embed CC1101 Plus** running [Bruce firmware](https://github.com/pr3y/Bruce).
+> A LOT of files for the **T-Embed CC1101** and **T-Embed CC1101 Plus** running [Bruce firmware](https://github.com/pr3y/Bruce).
 
 ---
 
-## 📁 Repository Structure
+## 📁 Folder Structure
 
 ```
 T-files/
-├── danger/          # High-risk / use-with-caution tools
-├── firmwares/       # Pre-built Bruce firmware .bin files
-├── html/            # Web-based tools and portals
-├── scripts/         # Bruce JS scripts (games, utilities, visualizers)
-└── README.md
+├── danger/       # High-risk / use-with-caution files
+├── firmwares/    # Bruce firmware binaries for flashing
+├── html/         # HTML portal pages served over Bruce's web server
+├── ir/           # Infrared remote signal files (.ir)
+├── payloads/     # Bruce JS scripts and automation payloads
+├── subghz/       # Sub-GHz signal captures (.sub)
+└── wordlists/    # Wordlists for Wi-Fi attacks and other brute-force tasks
 ```
 
 ---
 
-## 🎮 Scripts (`/scripts`)
+## 📂 What's Inside
 
-Bruce JS scripts that run directly on the device via the Scripts menu. Copy `.js` files to the `/scripts` folder on your T-Embed.
+### `firmwares/`
+Pre-built Bruce firmware `.bin` files ready to flash onto your T-Embed CC1101 or CC1101 Plus via the web flasher or `esptool`.
 
-### Games
+### `html/`
+Custom HTML pages that can be hosted from Bruce's built-in web server. Drop these onto the device and serve them over Wi-Fi for portal clones, landing pages, or evil twin setups.
 
-| File | Description |
-|------|-------------|
-| `geodash.js` | Geometry Dash-style auto-runner. Jump over spikes, speed increases over time. |
-| `slope.js` | Slope-style neon ball runner. Steer through obstacles, high score saved to storage. |
-| `doom.js` | Wolfenstein/Doom-style raycaster FPS. Full DDA raycaster, 7 enemies, minimap, shooting. |
-| `fortress.js` | Tower defense with 5 tower types, procedural paths, boss fight, power-ups, story dialogue. |
-| `papercraft.js` | 2D Minecraft-style side-scroller. Mine blocks, craft tools, fight enemies, defeat the boss. |
-| `starfire.js` | Bullet hell shmup. 5 waves + boss fight, power-ups, spread/laser/rapid fire. |
+### `ir/`
+Infrared signal files in Bruce/Flipper Zero `.ir` format. Covers a wide range of devices — TVs, AC units, projectors, lighting systems, and more. Drop into the `ir/` folder on your device's SD card.
 
-### Radio & RF Utilities
+### `payloads/`
+Bruce JS scripts (`.js`) for the device's JavaScript engine. Includes automation scripts, UI tools, radio utilities, and other fun stuff. Copy to the `/scripts/` directory on your device.
 
-| File | Description |
-|------|-------------|
-| `waterfall.js` | Sub-GHz spectrum waterfall visualizer (CC1101). Draw pixel art and transmit it SSTV-style so any other waterfall display sees your image. |
-| `adsb.js` | ADS-B aircraft listener. Connects to a local dump1090 server over WiFi and displays live aircraft data. |
+### `subghz/`
+Sub-GHz captures in `.sub` format compatible with Bruce and Flipper Zero. Covers common frequencies (315 MHz, 433 MHz, 868 MHz, 915 MHz) — garage doors, weather sensors, key fobs, and other RF targets. Copy to `/subghz/` on the SD card.
 
-### IR Utilities
+### `wordlists/`
+Text-based wordlists for Wi-Fi handshake cracking and PMKID attacks via Bruce's Wi-Fi tools. Compatible with Bruce's built-in wordlist attack feature.
 
-| File | Description |
-|------|-------------|
-| `remote.js` | Universal IR remote. Browse by device category (TV, AC, projector, soundbar, camera, set-top box), pick a brand, fire commands. Saves sent log to SD. |
-
-### Audio & Tone Tools
-
-| File | Description |
-|------|-------------|
-| `brainfreq.js` | Psychoacoustic frequency generator. 18+ research-backed frequencies across Delta/Theta/Alpha/Beta/Gamma/Solfeggio bands. Hold encoder to play. |
-| `memeboard.js` | Meme soundboard with 40+ classic jingles (Rickroll, Sandstorm, Nokia, Mario, Tetris, Nyan Cat, Coffin Dance, MLG Air Horn and more) recreated as buzzer tone sequences. |
+### `danger/`
+Files in here carry elevated risk — either destructive, highly disruptive, or only legal in specific contexts. Read the contents carefully and only use on networks/devices you own or have explicit permission to test.
 
 ---
 
-## ⚠️ Danger (`/danger`)
+## 🔧 Installation
 
-Tools in this folder are for **authorized use only** on systems you own or have explicit permission to test. Misuse may be illegal in your jurisdiction.
-
----
-
-## 💾 Firmwares (`/firmwares`)
-
-Pre-compiled Bruce firmware `.bin` files for the T-Embed CC1101 and CC1101 Plus. Flash with `esptool` or the Bruce web flasher.
-
+### Option A — Clone to SD card
 ```bash
-esptool.py --port /dev/ttyUSB0 write_flash 0x0 firmware.bin
+git clone https://github.com/notyetaperson/T-files
 ```
+Then copy the relevant folders to your T-Embed's SD card, mirroring the directory structure Bruce expects:
 
-Check [Bruce releases](https://github.com/pr3y/Bruce/releases) for the latest official builds.
+| Folder | SD Card Path |
+|--------|-------------|
+| `ir/` | `/ir/` |
+| `subghz/` | `/subghz/` |
+| `payloads/` | `/scripts/` |
+| `html/` | `/html/` |
+| `wordlists/` | `/wordlists/` |
 
----
-
-## 🌐 HTML (`/html`)
-
-Web-based tools and captive portal pages for use with Bruce's built-in web server.
-
----
-
-## 🚀 Getting Started
-
-### Requirements
-
-- M5Stack T-Embed CC1101 or CC1101 Plus
-- [Bruce firmware](https://github.com/pr3y/Bruce) flashed to the device
-- A way to copy files to the device (USB mass storage, SD card, or Bruce's built-in file manager)
-
-### Installing Scripts
-
-1. Copy `.js` files to the `/scripts` folder on your device (via SD card or Bruce file manager)
-2. From the Bruce main menu → **Scripts**
-3. Select the script and run
-
-### Installing Firmwares
-
-1. Put the device in flash mode (hold boot button while connecting USB)
-2. Flash with esptool or the [Bruce web flasher](https://bruce.computer/flasher)
+### Option B — Manual drop
+Download individual files from the GitHub UI and copy them to the matching folder on the SD card.
 
 ---
 
-## 🔧 Device Info
+## ⚡ Device Compatibility
 
-| Spec | Value |
-|------|-------|
-| MCU | ESP32-S3 |
-| Display | 320×170 ST7789 |
-| Sub-GHz radio | CC1101 (300–348 / 387–464 / 779–928 MHz) |
-| IR | TX + RX |
-| WiFi | 802.11 b/g/n |
-| Bluetooth | BLE 5.0 |
-| Storage | MicroSD |
+| Device | Status |
+|--------|--------|
+| T-Embed CC1101 | ✅ |
+| T-Embed CC1101 Plus | ✅ |
+| Flipper Zero (IR / Sub-GHz files) | ✅ (partial) |
+
+Most `.ir` and `.sub` files are cross-compatible with Flipper Zero. JS payloads are Bruce-specific.
 
 ---
 
-## 📖 Resources
+## ⚠️ Legal Disclaimer
 
-- [Bruce firmware](https://github.com/pr3y/Bruce)
-- [Bruce JS interpreter docs](https://wiki.bruce.computer/interpreter/)
-- [M5Stack T-Embed CC1101](https://docs.m5stack.com/en/atom/T-Embed-CC1101)
-- [Bruce wiki](https://wiki.bruce.computer)
+These files are provided for **educational purposes and authorized testing only**. Transmitting RF signals, capturing Sub-GHz traffic, cloning remotes, or running network attacks without the explicit permission of the owner is illegal in most jurisdictions.
+
+**Use responsibly. You own what you do with this.**
 
 ---
 
-## 📄 License
+## 🔗 Related
 
-Use responsibly. Only use RF/IR/WiFi tools on devices and networks you own or have explicit authorization to test.
+- [Bruce Firmware](https://github.com/pr3y/Bruce)
+- [Bruce Documentation](https://bruce.computer)
+- [T-Embed CC1101 Plus (LILYGO)](https://lilygo.cc)
